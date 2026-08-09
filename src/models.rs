@@ -4,7 +4,7 @@ use std::str::FromStr;
 use base64ct::Encoding;
 
 use oauth2::{RedirectUrl, Scope};
-use p256::elliptic_curve::sec1::ToEncodedPoint;
+use p256::elliptic_curve::sec1::ToSec1Point;
 use p256::SecretKey;
 
 use serde::{Deserialize, Serialize};
@@ -39,7 +39,7 @@ impl ProofKey {
     /// println!("{serialized}");
     /// ```
     pub fn new(key: &SecretKey) -> Self {
-        let point = key.public_key().to_encoded_point(false);
+        let point = key.public_key().to_sec1_point(false);
         Self {
             crv: "P-256".into(),
             alg: "ES256".into(),

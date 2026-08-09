@@ -14,11 +14,9 @@ use chrono::prelude::*;
 use log::{debug, info, warn};
 use nt_time::FileTime;
 use p256::{
-    ecdsa::{
-        signature::hazmat::{PrehashSigner, PrehashVerifier},
-        Signature, SigningKey, VerifyingKey,
-    },
-    SecretKey,
+    SecretKey, ecdsa::{
+        Signature, SigningKey, VerifyingKey, signature::hazmat::{PrehashSigner, PrehashVerifier},
+    }, elliptic_curve::Generate,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -331,7 +329,7 @@ impl RequestSigner {
     /// Creates a new instance of [`RequestSigner`]
     pub fn new() -> Self {
         Self {
-            keypair: SecretKey::random(&mut rand::thread_rng()),
+            keypair: SecretKey::generate_from_rng(&mut rand::rng()),
             signature_policy_cache: SignaturePolicyCache::default(),
         }
     }

@@ -15,14 +15,14 @@ use crate::{
     request_signer,
 };
 
-use oauth2::reqwest::async_http_client;
 use oauth2::{
     basic::{BasicClient, BasicErrorResponseType},
-    AuthType, AuthUrl, AuthorizationCode, Client as OAuthClient, ClientId, ClientSecret, CsrfToken,
+    AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
     DeviceAuthorizationUrl, PkceCodeChallenge, PkceCodeVerifier, RefreshToken, RequestTokenError,
     Scope, StandardDeviceAuthorizationResponse, StandardErrorResponse, TokenResponse, TokenUrl,
 };
-use oauth2::{EndUserVerificationUrl, UserCode, VerificationUriComplete};
+use oauth2_reqwest::ReqwestClient;
+use oauth2::{EndUserVerificationUrl, EndpointNotSet, EndpointSet, UserCode, VerificationUriComplete};
 use serde_json::json;
 use std::collections::HashMap;
 use url::{form_urlencoded, Url};
@@ -441,17 +441,31 @@ impl XalAuthenticator {
     /// Create an internal [`oauth2::Client`]
     ///
     /// Refer to [`oauth2`] crate for it's usage
-    pub fn oauth_client(&self) -> Result<BasicClient, Error> {
-        let client = OAuthClient::new(
-            ClientId::new(self.app_params.client_id.to_string()),
-            self.app_params.client_secret.clone().map(ClientSecret::new),
-            AuthUrl::new(Constants::OAUTH20_AUTHORIZE_URL.to_string())?,
-            Some(TokenUrl::new(Constants::OAUTH20_TOKEN_URL.to_string())?),
-        )
-        .set_auth_type(AuthType::RequestBody)
-        .set_device_authorization_url(DeviceAuthorizationUrl::new(
-            Constants::OAUTH20_DEVICE_AUTHORIZE_URL.to_string(),
-        )?);
+    pub fn oauth_client(
+        &self,
+    ) -> Result<
+        BasicClient<
+            EndpointSet,
+            EndpointSet,
+            EndpointNotSet,
+            EndpointNotSet,
+            EndpointSet,
+        >,
+        Error,
+    > {
+        let client = BasicClient::new(ClientId::new(self.app_params.client_id.to_string()))
+            .set_auth_uri(AuthUrl::new(Constants::OAUTH20_AUTHORIZE_URL.to_string())?)
+            .set_token_uri(TokenUrl::new(Constants::OAUTH20_TOKEN_URL.to_string())?)
+            .set_auth_type(AuthType::RequestBody)
+            .set_device_authorization_url(DeviceAuthorizationUrl::new(
+                Constants::OAUTH20_DEVICE_AUTHORIZE_URL.to_string(),
+            )?);
+
+        let client = if let Some(client_secret) = self.app_params.client_secret.clone() {
+            client.set_client_secret(ClientSecret::new(client_secret))
+        } else {
+            client
+        };
 
         Ok(client)
     }
@@ -545,12 +559,11 @@ impl XalAuthenticator {
     ) -> Result<StandardDeviceAuthorizationResponse, Error> {
         self.oauth_client()?
             .exchange_device_code()
-            .unwrap()
             .add_scopes(self.app_params.auth_scopes.clone())
             .add_extra_param("response_type", "device_code")
-            .request_async(&async_http_client)
+            .request_async(&ReqwestClient::from(self.client.clone()))
             .await
-            .map_err(std::convert::Into::into)
+            .map_err(Into::into)
     }
 
     /// Poll for device code.
@@ -592,7 +605,7 @@ impl XalAuthenticator {
     {
         self.oauth_client()?
             .exchange_device_access_token(device_auth_resp)
-            .request_async(&async_http_client, sleep_fn, None)
+            .request_async(&ReqwestClient::from(self.client.clone()), sleep_fn, None)
             .await
             .map_err(std::convert::Into::into)
     }
@@ -639,7 +652,7 @@ impl XalAuthenticator {
             req = req.set_pkce_verifier(pkce)
         }
 
-        req.request_async(&async_http_client)
+        req.request_async(&ReqwestClient::from(self.client.clone()))
             .await
             .map_err(std::convert::Into::into)
     }
@@ -694,7 +707,7 @@ impl XalAuthenticator {
             .oauth_client()?
             .exchange_refresh_token(refresh_token)
             .add_scopes(scopes)
-            .request_async(&async_http_client)
+            .request_async(&ReqwestClient::from(self.client.clone()))
             .await;
 
         // HACK: Catch message body from parsing failure and parse it ourselves
