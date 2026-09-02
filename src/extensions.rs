@@ -8,7 +8,7 @@ use http::response::Builder;
 use log::{debug, trace};
 use reqwest::ResponseBuilderExt;
 
-use crate::{error::Error, request_signer::RequestSigner, RequestSigning};
+use crate::{RequestSigning, error::Error, request_signer::RequestSigner};
 
 /// Extension to [`reqwest::RequestBuilder`] allowing for verbosely logging the request
 ///

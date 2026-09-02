@@ -10,7 +10,7 @@ use chrono::{DateTime, Utc};
 use env_logger::Env;
 use serde::Deserialize;
 use serde_json::json;
-use xal::{extensions::JsonExDeserializeMiddleware, Error, TokenStore, XalAuthenticator};
+use xal::{Error, TokenStore, XalAuthenticator, extensions::JsonExDeserializeMiddleware};
 
 #[derive(Debug, Deserialize)]
 pub struct SpartanTokenExpiry {
@@ -95,7 +95,9 @@ async fn main() -> Result<(), Error> {
         .await?;
     println!("Spartan Token: {spartan_token:?}");
 
-    let clearance_url = format!("https://settings.svc.halowaypoint.com/oban/flight-configurations/titles/hi/audiences/RETAIL/players/xuid({xuid})/active?sandbox=UNUSED&build=210921.22.01.10.1706-0");
+    let clearance_url = format!(
+        "https://settings.svc.halowaypoint.com/oban/flight-configurations/titles/hi/audiences/RETAIL/players/xuid({xuid})/active?sandbox=UNUSED&build=210921.22.01.10.1706-0"
+    );
     // Get halo clearance token
     let flighting_config = client
         .get(clearance_url)

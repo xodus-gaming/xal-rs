@@ -2,11 +2,11 @@
 //!
 
 use crate::{
+    Constants, ProofKey,
     error::Error,
     extensions::JsonExDeserializeMiddleware,
     models::SigningPolicy,
     response::{self, TitleEndpointsResponse},
-    Constants, ProofKey,
 };
 use async_trait::async_trait;
 use base64ct::{self, Base64, Encoding};
@@ -14,9 +14,12 @@ use chrono::prelude::*;
 use log::{debug, info, warn};
 use nt_time::FileTime;
 use p256::{
-    SecretKey, ecdsa::{
-        Signature, SigningKey, VerifyingKey, signature::hazmat::{PrehashSigner, PrehashVerifier},
-    }, elliptic_curve::Generate,
+    SecretKey,
+    ecdsa::{
+        Signature, SigningKey, VerifyingKey,
+        signature::hazmat::{PrehashSigner, PrehashVerifier},
+    },
+    elliptic_curve::Generate,
 };
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
@@ -363,7 +366,8 @@ impl RequestSigner {
             &request.authorization,
             &request.body,
             max_body_bytes,
-        )}
+        )
+    }
 
     /// Create signature from low-level parts
     #[allow(clippy::too_many_arguments)]
@@ -672,7 +676,6 @@ impl SignaturePolicyCache {
             }
         }
     }
-
 }
 
 #[cfg(test)]
@@ -680,7 +683,7 @@ mod test {
     use std::str::FromStr;
 
     use super::*;
-    use crate::{extensions::SigningReqwestBuilder, SigningAlgorithm};
+    use crate::{SigningAlgorithm, extensions::SigningReqwestBuilder};
     use hex_literal::hex;
     use reqwest::{Body, Client};
 
@@ -720,16 +723,20 @@ mod test {
 
         let mut cache = SignaturePolicyCache::new(get_title_endpoints());
 
-        assert!(cache
-            .find_policy_for_url("https://unhandled.example.com")
-            .await
-            .unwrap()
-            .is_none());
-        assert!(cache
-            .find_policy_for_url("https://unhandled.microsoft.com")
-            .await
-            .unwrap()
-            .is_none());
+        assert!(
+            cache
+                .find_policy_for_url("https://unhandled.example.com")
+                .await
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            cache
+                .find_policy_for_url("https://unhandled.microsoft.com")
+                .await
+                .unwrap()
+                .is_none()
+        );
 
         assert_eq!(
             cache
@@ -946,9 +953,11 @@ mod test {
         let signature = XboxWebSignatureBytes::from_str("AAAAAQHY4xgs5DyIujFG5E5MZ4D1xjd9Up+H4AKLoyBHd95MAUZcabUN//Y/gijed4vvKtlfp4Cd4dJzVhpK0m+sYZcYRqQjBEKAZw==")
             .expect("Failed to deserialize into XboxWebSignatureBytes");
 
-        assert!(signer
-            .verify_message(signature, &request, MAX_BODY_BYTES)
-            .is_ok())
+        assert!(
+            signer
+                .verify_message(signature, &request, MAX_BODY_BYTES)
+                .is_ok()
+        )
     }
 
     #[tokio::test]

@@ -8,10 +8,10 @@ use tokio::{
     net::TcpListener,
 };
 use xal::{
+    AuthPromptCallback, AuthPromptData, Error, XalAppParameters,
     client_params::CLIENT_ANDROID,
     oauth2::{RedirectUrl, Scope},
     url::Url,
-    AuthPromptCallback, AuthPromptData, Error, XalAppParameters,
 };
 use xal_examples::auth_main;
 

@@ -1,8 +1,8 @@
 //! Token store
 
 use crate::{
-    response::{DeviceToken, TitleToken, UserToken, WindowsLiveTokens, XSTSToken},
     Error, XalAppParameters, XalAuthenticator, XalClientParameters,
+    response::{DeviceToken, TitleToken, UserToken, WindowsLiveTokens, XSTSToken},
 };
 use chrono::{DateTime, Utc};
 use log::trace;

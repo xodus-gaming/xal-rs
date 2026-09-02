@@ -1,25 +1,28 @@
 //! Download savegames for a specific title
 //!
-use std::{collections::HashMap, path::Path};
 use std::io::Write;
 use std::path::PathBuf;
+use std::{collections::HashMap, path::Path};
 
-use log::{info, debug, trace};
 use async_trait::async_trait;
+use log::{debug, info, trace};
 use reqwest::Url;
 use serde::Deserialize;
-use tokio::{io::{AsyncReadExt, AsyncWriteExt}, net::TcpListener};
+use tokio::{
+    io::{AsyncReadExt, AsyncWriteExt},
+    net::TcpListener,
+};
 use xal::client_params::CLIENT_WINDOWS;
 use xal::cvlib::CorrelationVector;
-use xal::oauth2::{RedirectUrl, Scope};
-use xal::{
-    AccessTokenPrefix, AuthPromptCallback, AuthPromptData, Error, RequestSigner, XalAppParameters
-};
 use xal::extensions::CorrelationVectorReqwestBuilder;
-use xal::extensions::SigningReqwestBuilder;
 use xal::extensions::JsonExDeserializeMiddleware;
 use xal::extensions::LoggingReqwestRequestHandler;
 use xal::extensions::LoggingReqwestResponseHandler;
+use xal::extensions::SigningReqwestBuilder;
+use xal::oauth2::{RedirectUrl, Scope};
+use xal::{
+    AccessTokenPrefix, AuthPromptCallback, AuthPromptData, Error, RequestSigner, XalAppParameters,
+};
 use xal_examples::auth_main;
 
 #[derive(Deserialize, Debug)]
@@ -36,7 +39,7 @@ pub struct BlobMetadata {
     pub display_name: Option<String>,
     pub etag: String,
     pub client_file_time: String,
-    pub size: usize
+    pub size: usize,
 }
 
 #[derive(Deserialize, Debug)]
@@ -48,7 +51,7 @@ pub struct BlobsResponse {
 
 #[derive(Deserialize, Debug)]
 pub struct SavegameAtoms {
-    pub atoms: HashMap<String,String>,
+    pub atoms: HashMap<String, String>,
 }
 
 // Replace with your own Azure Client parameters
@@ -110,8 +113,7 @@ pub fn assemble_filepath(root_path: &Path, atom_type: &str, path: &str) -> PathB
         if let Some(stripped) = tmp.strip_prefix(std::path::MAIN_SEPARATOR_STR) {
             // Remove leading path seperator
             stripped.to_string()
-        }
-        else {
+        } else {
             tmp
         }
     };
@@ -120,8 +122,7 @@ pub fn assemble_filepath(root_path: &Path, atom_type: &str, path: &str) -> PathB
         if let Some(stripped) = atom_type.strip_prefix("/") {
             // Remove leading path seperator
             stripped.to_string()
-        }
-        else {
+        } else {
             atom_type.to_string()
         }
     };
@@ -191,7 +192,9 @@ async fn main() -> Result<(), Error> {
     }
 
     let metadata = client
-        .get(format!("https://titlestorage.xboxlive.com/connectedstorage/users/xuid({xuid})/scids/{scid}"))
+        .get(format!(
+            "https://titlestorage.xboxlive.com/connectedstorage/users/xuid({xuid})/scids/{scid}"
+        ))
         .header("x-xbl-contract-version", "107")
         .header("x-xbl-pfn", pfn)
         .header("Accept-Language", "en-US")
@@ -269,10 +272,8 @@ async fn main() -> Result<(), Error> {
     Ok(())
 }
 
-
 #[cfg(test)]
-mod tests
-{
+mod tests {
     use std::str::FromStr;
 
     use super::*;
@@ -283,19 +284,39 @@ mod tests
     fn test_assemble_unix() {
         assert_eq!(
             "/root/filesystem/Data/save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "Data", "/saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "Data",
+                "/saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "/root/filesystem/Data/save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "Data", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "Data",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "/root/filesystem/Custom Input Config.json/save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "/Custom Input Config.json", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "/Custom Input Config.json",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "/root/filesystem/Custom Input Config.json/save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "Custom Input Config.json", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "Custom Input Config.json",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
     }
 
@@ -304,25 +325,45 @@ mod tests
     fn test_assemble_filepath_windows() {
         assert_eq!(
             "C:\\some_dir\\Data\\save-container.bin",
-            assemble_filepath(&PathBuf::from_str("C:\\some_dir\\").unwrap(), "Data", "/saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("C:\\some_dir\\").unwrap(),
+                "Data",
+                "/saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "C:\\some_dir\\Data\\save-container.bin",
-            assemble_filepath(&PathBuf::from_str("C:\\some_dir\\").unwrap(), "Data", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("C:\\some_dir\\").unwrap(),
+                "Data",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "C:\\some_dir\\Custom Input Config.json\\save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "/Custom Input Config.json", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "/Custom Input Config.json",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
         assert_eq!(
             "C:\\some_dir\\Custom Input Config.json\\save-container.bin",
-            assemble_filepath(&PathBuf::from_str("/root/filesystem").unwrap(), "Custom Input Config.json", "saveEcontainerXbin,savedgame").as_os_str()
+            assemble_filepath(
+                &PathBuf::from_str("/root/filesystem").unwrap(),
+                "Custom Input Config.json",
+                "saveEcontainerXbin,savedgame"
+            )
+            .as_os_str()
         );
     }
 
     #[test]
     fn deserialize_blob_response() {
-        let data =  r#"{"blobs":[{"fileName":"save_container,savedgame","displayName":"Save Data","etag":"\"0x8DCA185D3F40E2A\"","clientFileTime":"2024-07-11T08:45:22.5700000Z","size":6745}],"pagingInfo":{"totalItems":1,"continuationToken":null}}"#;
+        let data = r#"{"blobs":[{"fileName":"save_container,savedgame","displayName":"Save Data","etag":"\"0x8DCA185D3F40E2A\"","clientFileTime":"2024-07-11T08:45:22.5700000Z","size":6745}],"pagingInfo":{"totalItems":1,"continuationToken":null}}"#;
         let _: BlobsResponse = serde_json::from_str(data).expect("Failed to deserialize");
     }
 
