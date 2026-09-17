@@ -27,6 +27,16 @@ use serde_json::json;
 use std::collections::HashMap;
 use url::{Url, form_urlencoded};
 
+/// OAuth2 client used by XAL: auth, device-auth and token endpoints are set;
+/// introspection and revocation are unused.
+pub type XalOauthClient = BasicClient<
+    EndpointSet,    // Auth URL
+    EndpointSet,    // Device Auth URL
+    EndpointNotSet, // Introspection URL
+    EndpointNotSet, // Revocation URL
+    EndpointSet,    // Token URL
+>;
+
 /// Authentication related constants
 pub struct Constants;
 
@@ -435,24 +445,13 @@ impl XalAuthenticator {
         self.app_params
             .redirect_uri
             .clone()
-            .map(|url| Url::parse(&url).unwrap())
+            .map(|url| url.url().clone())
     }
 
     /// Create an internal [`oauth2::Client`]
     ///
     /// Refer to [`oauth2`] crate for it's usage
-    pub fn oauth_client(
-        &self,
-    ) -> Result<
-        BasicClient<
-            EndpointSet,    // Auth URL (set_auth_uri)
-            EndpointSet,    // Device Auth URL (set_device_authorization_url)
-            EndpointNotSet, // Introspect URL
-            EndpointNotSet, // Revoke URL
-            EndpointSet,    // Token URL (set_token_uri)
-        >,
-        Error,
-    > {
+    pub fn oauth_client(&self) -> Result<XalOauthClient, Error> {
         let client = BasicClient::new(ClientId::new(self.app_params.client_id.to_string()))
             .set_auth_uri(AuthUrl::new(Constants::OAUTH20_AUTHORIZE_URL.to_string())?)
             .set_token_uri(TokenUrl::new(Constants::OAUTH20_TOKEN_URL.to_string())?)
