@@ -2,12 +2,12 @@
 //!
 use env_logger::Env;
 use xal::{
+    Error, RequestSigner, TokenStore,
     cvlib::CorrelationVector,
     extensions::{
         CorrelationVectorReqwestBuilder, LoggingReqwestRequestHandler,
         LoggingReqwestResponseHandler, SigningReqwestBuilder,
     },
-    Error, RequestSigner, TokenStore,
 };
 
 #[tokio::main]

@@ -8,9 +8,9 @@ use oauth2::{
 use url::Url;
 
 use crate::{
+    AccessTokenPrefix, Error, XalAuthenticator,
     response::{SisuAuthenticationResponse, WindowsLiveTokens},
     tokenstore::TokenStore,
-    AccessTokenPrefix, Error, XalAuthenticator,
 };
 
 /// Argument passed into [`crate::flows::AuthPromptCallback`]

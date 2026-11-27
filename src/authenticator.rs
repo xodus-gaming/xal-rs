@@ -7,25 +7,35 @@ use crate::{AccessTokenPrefix, RequestSigner};
 
 use crate::request::{
     XADProperties, XADPropertiesRPS, XASTProperties, XASTPropertiesWin, XASUProperties,
-XSTSProperties, XTokenRequest,
+    XSTSProperties, XTokenRequest,
 };
 use crate::{
     error::Error,
-    models::{request, response, DeviceType, XalAppParameters, XalClientParameters},
+    models::{DeviceType, XalAppParameters, XalClientParameters, request, response},
     request_signer,
 };
 
-use oauth2::reqwest::async_http_client;
 use oauth2::{
+    AuthType, AuthUrl, AuthorizationCode, ClientId, ClientSecret, CsrfToken,
+    DeviceAuthorizationUrl, EndUserVerificationUrl, EndpointNotSet, EndpointSet, PkceCodeChallenge,
+    PkceCodeVerifier, RefreshToken, RequestTokenError, Scope, StandardDeviceAuthorizationResponse,
+    StandardErrorResponse, TokenResponse, TokenUrl, UserCode, VerificationUriComplete,
     basic::{BasicClient, BasicErrorResponseType},
-    AuthType, AuthUrl, AuthorizationCode, Client as OAuthClient, ClientId, ClientSecret, CsrfToken,
-    DeviceAuthorizationUrl, PkceCodeChallenge, PkceCodeVerifier, RefreshToken, RequestTokenError,
-    Scope, StandardDeviceAuthorizationResponse, StandardErrorResponse, TokenResponse, TokenUrl,
 };
-use oauth2::{EndUserVerificationUrl, UserCode, VerificationUriComplete};
+use oauth2_reqwest::ReqwestClient;
 use serde_json::json;
 use std::collections::HashMap;
-use url::{form_urlencoded, Url};
+use url::{Url, form_urlencoded};
+
+/// OAuth2 client used by XAL: auth, device-auth and token endpoints are set;
+/// introspection and revocation are unused.
+pub type XalOauthClient = BasicClient<
+    EndpointSet,    // Auth URL
+    EndpointSet,    // Device Auth URL
+    EndpointNotSet, // Introspection URL
+    EndpointNotSet, // Revocation URL
+    EndpointSet,    // Token URL
+>;
 
 /// Authentication related constants
 pub struct Constants;
@@ -435,23 +445,26 @@ impl XalAuthenticator {
         self.app_params
             .redirect_uri
             .clone()
-            .map(|url| Url::parse(&url).unwrap())
+            .map(|url| url.url().clone())
     }
 
     /// Create an internal [`oauth2::Client`]
     ///
     /// Refer to [`oauth2`] crate for it's usage
-    pub fn oauth_client(&self) -> Result<BasicClient, Error> {
-        let client = OAuthClient::new(
-            ClientId::new(self.app_params.client_id.to_string()),
-            self.app_params.client_secret.clone().map(ClientSecret::new),
-            AuthUrl::new(Constants::OAUTH20_AUTHORIZE_URL.to_string())?,
-            Some(TokenUrl::new(Constants::OAUTH20_TOKEN_URL.to_string())?),
-        )
-        .set_auth_type(AuthType::RequestBody)
-        .set_device_authorization_url(DeviceAuthorizationUrl::new(
-            Constants::OAUTH20_DEVICE_AUTHORIZE_URL.to_string(),
-        )?);
+    pub fn oauth_client(&self) -> Result<XalOauthClient, Error> {
+        let client = BasicClient::new(ClientId::new(self.app_params.client_id.to_string()))
+            .set_auth_uri(AuthUrl::new(Constants::OAUTH20_AUTHORIZE_URL.to_string())?)
+            .set_token_uri(TokenUrl::new(Constants::OAUTH20_TOKEN_URL.to_string())?)
+            .set_auth_type(AuthType::RequestBody)
+            .set_device_authorization_url(DeviceAuthorizationUrl::new(
+                Constants::OAUTH20_DEVICE_AUTHORIZE_URL.to_string(),
+            )?);
+
+        let client = if let Some(client_secret) = self.app_params.client_secret.clone() {
+            client.set_client_secret(ClientSecret::new(client_secret))
+        } else {
+            client
+        };
 
         Ok(client)
     }
@@ -545,12 +558,11 @@ impl XalAuthenticator {
     ) -> Result<StandardDeviceAuthorizationResponse, Error> {
         self.oauth_client()?
             .exchange_device_code()
-            .unwrap()
             .add_scopes(self.app_params.auth_scopes.clone())
             .add_extra_param("response_type", "device_code")
-            .request_async(&async_http_client)
+            .request_async(&ReqwestClient::from(self.client.clone()))
             .await
-            .map_err(std::convert::Into::into)
+            .map_err(Into::into)
     }
 
     /// Poll for device code.
@@ -592,7 +604,7 @@ impl XalAuthenticator {
     {
         self.oauth_client()?
             .exchange_device_access_token(device_auth_resp)
-            .request_async(&async_http_client, sleep_fn, None)
+            .request_async(&ReqwestClient::from(self.client.clone()), sleep_fn, None)
             .await
             .map_err(std::convert::Into::into)
     }
@@ -639,7 +651,7 @@ impl XalAuthenticator {
             req = req.set_pkce_verifier(pkce)
         }
 
-        req.request_async(&async_http_client)
+        req.request_async(&ReqwestClient::from(self.client.clone()))
             .await
             .map_err(std::convert::Into::into)
     }
@@ -694,7 +706,7 @@ impl XalAuthenticator {
             .oauth_client()?
             .exchange_refresh_token(refresh_token)
             .add_scopes(scopes)
-            .request_async(&async_http_client)
+            .request_async(&ReqwestClient::from(self.client.clone()))
             .await;
 
         // HACK: Catch message body from parsing failure and parse it ourselves
@@ -1263,7 +1275,8 @@ impl XalAuthenticator {
             .log()
             .await?
             .json_ex::<response::TitleToken>()
-            .await}
+            .await
+    }
 
     /// Authenticates with the Xbox Live service and retrieves an XSTS token.
     ///
@@ -1366,13 +1379,14 @@ impl XalAuthenticator {
             .log()
             .await?
             .json_ex::<response::XSTSToken>()
-            .await}
+            .await
+    }
 }
 
 #[cfg(test)]
 mod test {
     use super::*;
-    use oauth2::{basic::BasicTokenType, RequestTokenError};
+    use oauth2::{RequestTokenError, basic::BasicTokenType};
     use std::time::Duration;
 
     fn parse_authorization_code_response(
@@ -1412,7 +1426,10 @@ mod test {
 
     #[test]
     fn authorization_code_response_error() {
-        let ret = parse_authorization_code_response("ms-xal-public-beta-000000004c20a908://?error=unknown_error&error_description=some_error_desc&error_uri=some_error_uri", None);
+        let ret = parse_authorization_code_response(
+            "ms-xal-public-beta-000000004c20a908://?error=unknown_error&error_description=some_error_desc&error_uri=some_error_uri",
+            None,
+        );
 
         assert!(ret.is_err());
         match ret {
@@ -1439,8 +1456,14 @@ mod test {
             .expect("Failed parsing..");
 
         assert_eq!(live_tokens.token_type(), &BasicTokenType::Bearer);
-        assert_eq!(live_tokens.access_token().secret(), "EwAYA+SpFvzVdqQK4qPrPticr6YwVhZtUQYx8QEmKUlOy48j/DFgHrsUGfdoE7UnUZ6thRthHLq5YHXpn1rvRA7hGWiilt08MnbIEVy0ZPCyNx/1yiHe4Y7iEs40TrkH6i7FW3B0sk2WPuFQFI8B592TnR74yxpdMntpzpPdM34gdPGPtBDLiIvHdvRJMMj95JsOm/f2MZiQd/3L0L92CIAwwUdx/HLrfw85Va6jsL2y39bxI56xivbMj6e6eAFRX3eMfH8lRiO2Ro58KnG8fFncduisPOAVf2fcsQM0DxjboKLSUgB7d4qwc0iIMcrdvCQjCi2d202tXPlwjKYCgeYls7nEn3xGu31dvbygnGrz/jeO1NwWzrrSAqxk9sF0sEwm1hsyES2Q5RVJkj4xvHNMLSsXGmZMe7yRqPUU7enRii8Jg7NGIvA");
-        assert_eq!(live_tokens.refresh_token().unwrap().secret(), "M.C104_BL2.-AfLD2hcS42M2c867oIQF27DQ5ldU9JNt5yfOv5V2picnPBloUElr5I7Qg25xkjaKGifYXRwJUtJi1gT6JBr3d2fLE8Gh323VS9Oz3pk89ygxxkPjQlhIlx6m6F1t919SaqJw3tXID5OT8EmadB4vLcjcLotlS2l2CMuo4q/lP/DyJqQ5pzryGdRWu4oHott4Ubylo8r3qUw9JgntYHTBxbo2kJFkkTp8ue6Yd82kXQNBEhVqmpKzE6eGeNX5HzD35MFis2YlAndF8QW8GnGW9X3zIKHvOVOG4XJt8ZLI81LDMoiAaYJ7kPDEXtDXmWxoGaOpR/Zff6PkyKEbuWS0ZxPtQqqWH2efnx4SODcz7WjaM3DerG6DQJhqFHtGOa3MwMNw420Zl1SQIVlIksLpGZmiSqCBKRyjSbuddZQ2away4Q$$");
+        assert_eq!(
+            live_tokens.access_token().secret(),
+            "EwAYA+SpFvzVdqQK4qPrPticr6YwVhZtUQYx8QEmKUlOy48j/DFgHrsUGfdoE7UnUZ6thRthHLq5YHXpn1rvRA7hGWiilt08MnbIEVy0ZPCyNx/1yiHe4Y7iEs40TrkH6i7FW3B0sk2WPuFQFI8B592TnR74yxpdMntpzpPdM34gdPGPtBDLiIvHdvRJMMj95JsOm/f2MZiQd/3L0L92CIAwwUdx/HLrfw85Va6jsL2y39bxI56xivbMj6e6eAFRX3eMfH8lRiO2Ro58KnG8fFncduisPOAVf2fcsQM0DxjboKLSUgB7d4qwc0iIMcrdvCQjCi2d202tXPlwjKYCgeYls7nEn3xGu31dvbygnGrz/jeO1NwWzrrSAqxk9sF0sEwm1hsyES2Q5RVJkj4xvHNMLSsXGmZMe7yRqPUU7enRii8Jg7NGIvA"
+        );
+        assert_eq!(
+            live_tokens.refresh_token().unwrap().secret(),
+            "M.C104_BL2.-AfLD2hcS42M2c867oIQF27DQ5ldU9JNt5yfOv5V2picnPBloUElr5I7Qg25xkjaKGifYXRwJUtJi1gT6JBr3d2fLE8Gh323VS9Oz3pk89ygxxkPjQlhIlx6m6F1t919SaqJw3tXID5OT8EmadB4vLcjcLotlS2l2CMuo4q/lP/DyJqQ5pzryGdRWu4oHott4Ubylo8r3qUw9JgntYHTBxbo2kJFkkTp8ue6Yd82kXQNBEhVqmpKzE6eGeNX5HzD35MFis2YlAndF8QW8GnGW9X3zIKHvOVOG4XJt8ZLI81LDMoiAaYJ7kPDEXtDXmWxoGaOpR/Zff6PkyKEbuWS0ZxPtQqqWH2efnx4SODcz7WjaM3DerG6DQJhqFHtGOa3MwMNw420Zl1SQIVlIksLpGZmiSqCBKRyjSbuddZQ2away4Q$$"
+        );
         //assert_eq!(live_tokens.user_id(), "0787a39b92e882f4d7e");
         assert_eq!(live_tokens.expires_in(), Some(Duration::from_secs(86400)));
         assert_eq!(live_tokens.scopes().unwrap().len(), 1);

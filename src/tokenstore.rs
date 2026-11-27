@@ -1,8 +1,8 @@
 //! Token store
 
 use crate::{
-    response::{DeviceToken, TitleToken, UserToken, WindowsLiveTokens, XSTSToken},
     Error, XalAppParameters, XalAuthenticator, XalClientParameters,
+    response::{DeviceToken, TitleToken, UserToken, WindowsLiveTokens, XSTSToken},
 };
 use chrono::{DateTime, Utc};
 use log::trace;
@@ -175,12 +175,12 @@ impl TokenStore {
 #[cfg(test)]
 mod tests {
     use oauth2::TokenResponse;
-    use rand::distributions::{Alphanumeric, DistString};
+    use rand::distr::{Alphanumeric, SampleString};
 
     use super::*;
 
     fn random_filename() -> String {
-        Alphanumeric.sample_string(&mut rand::thread_rng(), 16)
+        Alphanumeric.sample_string(&mut rand::rng(), 16)
     }
 
     #[test]

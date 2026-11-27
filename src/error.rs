@@ -3,8 +3,7 @@
 
 use chrono::{DateTime, Utc};
 use oauth2::{
-    basic::BasicErrorResponse, reqwest::AsyncHttpClientError, DeviceCodeErrorResponse,
-    RequestTokenError,
+    DeviceCodeErrorResponse, HttpClientError, RequestTokenError, basic::BasicErrorResponse,
 };
 use reqwest::header::InvalidHeaderValue;
 use thiserror::Error;
@@ -18,10 +17,14 @@ pub enum Error {
     UrlParseError(#[from] ParseError),
     /// OAuth2 failed
     #[error("Failed executing oauth request")]
-    OAuthExecutionError(#[from] RequestTokenError<AsyncHttpClientError, BasicErrorResponse>),
+    OAuthExecutionError(
+        #[from] RequestTokenError<HttpClientError<reqwest::Error>, BasicErrorResponse>,
+    ),
     /// OAuth2 device code flow failed
     #[error("Failed executing oauth request")]
-    OAuthDeviceCodeError(#[from] RequestTokenError<AsyncHttpClientError, DeviceCodeErrorResponse>),
+    OAuthDeviceCodeError(
+        #[from] RequestTokenError<HttpClientError<reqwest::Error>, DeviceCodeErrorResponse>,
+    ),
     /// Generic Reqwest HTTP client error
     #[error("Reqwest error")]
     ReqwestError(#[from] reqwest::Error),

@@ -1,7 +1,7 @@
 [package]
 name = "xal"
 version = "0.1.3"
-edition = "2018"
+edition = "2024"
 description = "Xbox Authentication library"
 license = "MIT"
 repository = "https://github.com/OpenXbox/xal-rs"
@@ -10,28 +10,29 @@ homepage = "https://openxbox.org"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-async-trait = "0.1.74"
-reqwest = { version = "0.11", features = ["json"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+async-trait = "0.1.92"
+reqwest = { version = "0.13.4", features = ["json", "query"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.151"
 cvlib = "0.1.2"
-chrono = "0.4"
-uuid = { version = "1", features = ["v4", "serde"] }
-thiserror = "1.0.37"
-url = "2.3.1"
-http = "0.2.9"
-log = "0.4.20"
-p256 = "0.13.2"
-base64ct = { version = "1.6.0", features = ["std"] }
-sha2 = "0.10.8"
-rand = "0.8.5"
-oauth2 = "4.4.2"
-nt-time = { version = "0.6.5", features = ["chrono"] }
+chrono = "0.4.45"
+uuid = { version = "1.26.0", features = ["v4", "serde"] }
+thiserror = "2.0.20"
+url = "2.5.8"
+http = "1.5.0"
+log = "0.4.34"
+p256 = "0.14.0"
+base64ct = { version = "1.8.3", features = ["std"] }
+sha2 = "0.11.0"
+rand = "0.10.2"
+oauth2 = { version = "5.0.0", default-features = false, features = ["pkce-plain"] }
+oauth2-reqwest = "0.1.0-alpha.3"
+nt-time = { version = "0.15.0", features = ["chrono"] }
 
 [dev-dependencies]
-hex-literal = "0.3.4"
-tokio = { version = "1", features = ["macros"] }
-tokio-test = "0.4.3"
+hex-literal = "1.1.0"
+tokio = { version = "1.53.1", features = ["macros"] }
+tokio-test = "0.4.5"
 
 [workspace]
 members = [

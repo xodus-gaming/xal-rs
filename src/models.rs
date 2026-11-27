@@ -4,8 +4,8 @@ use std::str::FromStr;
 use base64ct::Encoding;
 
 use oauth2::{RedirectUrl, Scope};
-use p256::elliptic_curve::sec1::ToEncodedPoint;
 use p256::SecretKey;
+use p256::elliptic_curve::sec1::ToSec1Point;
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -39,7 +39,7 @@ impl ProofKey {
     /// println!("{serialized}");
     /// ```
     pub fn new(key: &SecretKey) -> Self {
-        let point = key.public_key().to_encoded_point(false);
+        let point = key.public_key().to_sec1_point(false);
         Self {
             crv: "P-256".into(),
             alg: "ES256".into(),
@@ -835,7 +835,7 @@ pub mod client_params {
             user_agent: "XAL GRTS 2024.02.20240220.000".into(),
             device_type: DeviceType::WIN32,
             client_version: "10.0.22621.4196".into(),
-            query_display: "none".into()
+            query_display: "none".into(),
         }
     }
 }
